@@ -477,13 +477,7 @@ public:
                 int dy = std::abs(y - player.pos.y);
                 float distance = static_cast<float>(dx + dy); // Distance de Manhattan
                 
-                // Si la distance dépasse le rayon de vision, on applique un effet de brouillard
-                if (distance > VISION_RADIUS) {
-                    // Option 1 : Ne rien dessiner au-delà du rayon
-                    continue;
-                }
-                
-                // Option 2 : Appliquer une transparence progressive
+                // Appliquer une transparence progressive
                 float alpha = 255.f; // Opacité complète par défaut
                 if (distance > VISION_RADIUS / 2) {
                     // Réduire l'opacité progressivement entre la moitié du rayon et le bord
@@ -520,6 +514,9 @@ public:
                         break;
                     case ARMOR:
                         sprite = createSprite(armorTexture);
+                        break;
+                    case ROOM:
+                        sprite = createSprite(floorTexture);
                         break;
                 }
                 

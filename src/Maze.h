@@ -13,7 +13,6 @@ const int GRID_SIZE = 38; // Size of each cell in pixels
 const int GRID_WIDTH = 41; // Number of cells horizontally (odd for maze generation)
 const int GRID_HEIGHT = 28; // Number of cells vertically (odd for maze generation)
 const float MOVE_DELAY = 0.15f; // Seconds between moves
-
 // Game entity types
 enum EntityType {
     EMPTY = 0,
@@ -23,7 +22,8 @@ enum EntityType {
     ENEMY = 4,
     HEAL = 5,
     WEAPON = 6,
-    ARMOR = 7
+    ARMOR = 7,
+    ROOM = 8 
 };
 
 class Maze {
@@ -38,6 +38,7 @@ class Maze {
         std::vector<std::vector<int>>& getGrid();
         void addRooms();
         void recursiveBacktrack(int x, int y);
+        void createRooms();
     
     private:
         // Member variables
