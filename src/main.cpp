@@ -468,8 +468,7 @@ public:
     void draw(sf::RenderWindow& window) {
         window.clear(sf::Color(30, 30, 40));
         
-        sf::Sprite sprite(playerTexture); // Sprite réutilisable
-        
+        sf::Sprite sprite(floorTexture); // Sprite réutilisable
         for (int y = 0; y < GRID_HEIGHT; y++) {
             for (int x = 0; x < GRID_WIDTH; x++) {
                 // Calculer la distance entre la case et le joueur (distance de Manhattan)
@@ -484,7 +483,7 @@ public:
                     alpha = 255.f * (VISION_RADIUS - distance) / (VISION_RADIUS / 2);
                     alpha = std::max(0.f, std::min(255.f, alpha)); // Limiter entre 0 et 255
                 }
-                
+
                 switch (grid[y][x]) {
                     case EMPTY:
                         sprite = createSprite(floorTexture);
@@ -493,6 +492,10 @@ public:
                         sprite = createSprite(wallTexture);
                         break;
                     case PLAYER:
+                        sprite = createSprite(floorTexture);
+                        sprite.setPosition(sf::Vector2f(x * GRID_SIZE, y * GRID_SIZE));
+                        sprite.setColor(sf::Color(255, 255, 255, static_cast<uint8_t>(alpha)));
+                        window.draw(sprite);
                         sprite = createSprite(playerTexture);
                         break;
                     case STAIRS:
