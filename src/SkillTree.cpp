@@ -290,7 +290,7 @@ SkillTree::SkillTree() : selectedSkillIndex(0), isActive(false), titleText(font)
         }
     }
     
-    std::vector<Skill*> SkillTree::getUnlockedSkills() {
+    std::vector<Skill*> SkillTree::getUnlockedSkills() const {
         std::vector<Skill*> result;
         for (auto& skill : skills) {
             if (skill->isUnlocked()) {

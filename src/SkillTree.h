@@ -81,7 +81,7 @@ public:
     void handleInput(const sf::Clock& inputClock, float inputDelay);
     void updateDescription();
     void draw(sf::RenderWindow& window);
-    std::vector<Skill*> getUnlockedSkills();
+    std::vector<Skill*> getUnlockedSkills() const;
 };
 
 #endif // SKILL_H

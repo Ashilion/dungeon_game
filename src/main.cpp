@@ -16,7 +16,8 @@
 #define ATTACK_DELAY 0.5f
 #define PLAYER_BASE_HP 100
 #define PLAYER_BASE_ATTACK 15
-#define MAX_LEVEL 10  // Maximum number of levels before winning
+#define MAX_LEVEL 1  // Maximum number of levels before winning
+
 int VISION_RADIUS = 8;  // Rayon de vision en nombre de cases  
 
 struct EnemyType {
@@ -50,6 +51,7 @@ private:
     sf::Texture weaponTexture;
     sf::Texture armorTexture;
     sf::Texture floorTexture;
+    sf::Texture treasureTexture;
     std::vector<sf::Texture> enemyTextures; // One for each enemy type
     SkillTree skillTree;
     int skillPoints;
@@ -135,6 +137,9 @@ public:
         if (!floorTexture.loadFromFile("assets/floor.jpg")) {
             std::cerr << "Error loading floor texture\n";
         }
+        if (!treasureTexture.loadFromFile("assets/treasure.jpg")) {
+            std::cerr << "Error loading treasure texture\n";
+        }
         
         // Load enemy textures
         enemyTextures.resize(3);
@@ -183,9 +188,6 @@ public:
                 player.attack += 10;
                 break;
             case Skill::SkillType::VISION_BOOST:
-                // Increase VISION_RADIUS by 3
-                // You'll need to make VISION_RADIUS a class member instead of a #define
-                // to modify it at runtime
                 VISION_RADIUS +=3;
                 break;
             // Other skill types will be used when the player activates them
@@ -208,8 +210,13 @@ public:
     
         // Generate a new maze
         Maze maze(rng());
+        
+        if (level < MAX_LEVEL) {
+            maze.placeStairs(); 
+        } else {
+            maze.placeTreasure();
+        }
         grid = maze.getGrid();
-    
         // Ensure the grid is valid
         if (grid.empty() || grid.size() != GRID_HEIGHT || grid[0].size() != GRID_WIDTH) {
             std::cerr << "Error: Invalid grid dimensions!" << std::endl;
@@ -613,7 +620,7 @@ public:
         
         if (moved && newPos != player.pos) {
             int target = grid[newPos.y][newPos.x];
-            if (target == EMPTY || target >= HEAL) {
+            if (target == EMPTY || (target >= HEAL && target <= ARMOR ) || target== ROOM) {
                 // Always empty old player position
                 grid[player.pos.y][player.pos.x] = EMPTY;
                 
@@ -630,6 +637,12 @@ public:
             else if (target == STAIRS) {
                 level++;
                 generateNewLevel();
+                moveClock.restart();
+            }
+            else if (target == TREASURE) {
+                // Handle winning the game
+                std::cout << "Congratulations! You found the treasure and won the game!\n";
+                level++; // This will put level at MAX_LEVEL + 1
                 moveClock.restart();
             }
             inCombat = isAdjacentToEnemy(player.pos);
@@ -736,6 +749,9 @@ public:
                         break;
                     case ROOM:
                         sprite = createSprite(floorTexture);
+                        break;
+                    case TREASURE:
+                        sprite = createSprite(treasureTexture);
                         break;
                 }
                 
@@ -949,6 +965,35 @@ public:
             ));
             window.draw(levelText);
         }
+
+        if (level > MAX_LEVEL) {
+            sf::RectangleShape winBg;
+            winBg.setSize(sf::Vector2f(GRID_SIZE * GRID_WIDTH, GRID_SIZE * GRID_HEIGHT));
+            winBg.setFillColor(sf::Color(0, 0, 0, 200));
+            window.draw(winBg);
+            
+            sf::Text winText(font);
+            winText.setCharacterSize(48);
+            winText.setFillColor(sf::Color::Yellow);
+            winText.setString("YOU WIN!");
+            winText.setPosition(sf::Vector2f(
+                GRID_SIZE * GRID_WIDTH / 2 - 100.f,
+                GRID_SIZE * GRID_HEIGHT / 2 - 50.f
+            ));
+            window.draw(winText);
+            
+            sf::Text treasureText(font);
+            treasureText.setCharacterSize(24);
+            treasureText.setFillColor(sf::Color::White);
+            treasureText.setString("You found the treasure!");
+            treasureText.setPosition(sf::Vector2f(
+                GRID_SIZE * GRID_WIDTH / 2 - 120.f,
+                GRID_SIZE * GRID_HEIGHT / 2 + 10.f
+            ));
+            window.draw(treasureText);
+        }
+        
+        
         
         // Draw level indicator
         sf::Text levelIndicator(font);

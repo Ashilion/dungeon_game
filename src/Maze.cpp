@@ -6,7 +6,7 @@ Maze::Maze(unsigned seed) : rng(seed) {
     grid.resize(GRID_HEIGHT, std::vector<int>(GRID_WIDTH, WALL));
     createRooms();
     generateMaze();
-    placeStairs();
+    // placeStairs();
 }
 
 // generateMaze() (unchanged)
@@ -164,6 +164,16 @@ void Maze::placeStairs() {
     } while (grid[sy][sx] != EMPTY && grid[sy][sx] != ROOM);
 
     grid[sy][sx] = STAIRS;
+}
+
+void Maze::placeTreasure() {
+    int sx, sy;
+    do {
+        sx = std::uniform_int_distribution<int>(GRID_WIDTH / 2, GRID_WIDTH - 3)(rng);
+        sy = std::uniform_int_distribution<int>(GRID_HEIGHT / 2, GRID_HEIGHT - 3)(rng);
+    } while (grid[sy][sx] != EMPTY && grid[sy][sx] != ROOM);
+
+    grid[sy][sx] = TREASURE;
 }
 
 // Get the grid (const version)

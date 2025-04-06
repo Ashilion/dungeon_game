@@ -23,7 +23,8 @@ enum EntityType {
     HEAL = 5,
     WEAPON = 6,
     ARMOR = 7,
-    ROOM = 8 
+    ROOM = 8 ,
+    TREASURE = 9,
 };
 
 class Maze {
@@ -34,6 +35,7 @@ class Maze {
         // Public methods
         void generateMaze();
         void placeStairs();
+        void placeTreasure();
         const std::vector<std::vector<int>>& getGrid() const;
         std::vector<std::vector<int>>& getGrid();
         void addRooms();

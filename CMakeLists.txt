@@ -20,6 +20,14 @@ set(SOURCES
     src/SkillTree.cpp
     src/Object.cpp
     src/HealPotion.cpp
+    src/view/CombatPromptView.cpp
+    src/view/EnemyStatsView.cpp
+    src/view/SkillsView.cpp
+    src/view/GameGridView.cpp
+    src/view/InventoryView.cpp
+    src/view/PlayerStatsView.cpp
+    src/view/View.cpp
+    src/view/ViewManager.cpp
 )
 
 # Add your header files (optional, but good practice)
