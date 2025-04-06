@@ -17,7 +17,7 @@
 #define PLAYER_BASE_HP 100
 #define PLAYER_BASE_ATTACK 15
 #define MAX_LEVEL 10  // Maximum number of levels before winning
-#define VISION_RADIUS 8  // Rayon de vision en nombre de cases  
+int VISION_RADIUS = 8;  // Rayon de vision en nombre de cases  
 
 struct EnemyType {
     int baseHp;
@@ -186,6 +186,7 @@ public:
                 // Increase VISION_RADIUS by 3
                 // You'll need to make VISION_RADIUS a class member instead of a #define
                 // to modify it at runtime
+                VISION_RADIUS +=3;
                 break;
             // Other skill types will be used when the player activates them
             default:
