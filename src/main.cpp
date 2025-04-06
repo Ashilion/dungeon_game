@@ -6,6 +6,9 @@
 #include <chrono>
 #include "Maze.h"
 #include "SkillTree.h" 
+#include "Object.h"
+#include "HealPotion.h"
+#include "Entity.h"
 
 #define ENEMY_COUNT 5
 #define ITEM_COUNT 3
@@ -13,8 +16,8 @@
 #define ATTACK_DELAY 0.5f
 #define PLAYER_BASE_HP 100
 #define PLAYER_BASE_ATTACK 15
+#define MAX_LEVEL 10  // Maximum number of levels before winning
 #define VISION_RADIUS 8  // Rayon de vision en nombre de cases  
-
 
 struct EnemyType {
     int baseHp;
@@ -23,13 +26,7 @@ struct EnemyType {
     std::string name;
 };
 
-struct Entity {
-    sf::Vector2i pos;
-    int hp;
-    int attack;
-    int type;  // Used for enemies to determine their type
-    Entity(sf::Vector2i p, int h, int a, int t = 0) : pos(p), hp(h), attack(a), type(t) {}
-};
+
 
 class Game {
 private:
@@ -45,6 +42,7 @@ private:
     sf::Font font;
     sf::Text playerStatsText;
     sf::Text enemyStatsText;
+    sf::Text inventoryText;
     sf::Texture playerTexture;
     sf::Texture wallTexture;
     sf::Texture stairsTexture;
@@ -59,6 +57,12 @@ private:
     sf::Clock inputClock;
     bool wallBreakerMode = false;
     sf::Clock wallBreakerClock;
+    
+    // New inventory system
+    std::vector<Object*> worldObjects;      // Objects in the world
+    std::vector<Object*> inventory;         // Player's inventory
+    bool showInventory = false;             // Toggle for inventory display
+    int selectedInventoryItem = 0;          // Currently selected inventory item
 
     // Define enemy types
     std::vector<EnemyType> enemyTypes = {
@@ -85,7 +89,8 @@ private:
 
 public:
     Game() : player(sf::Vector2i(0, 0), PLAYER_BASE_HP, PLAYER_BASE_ATTACK), 
-             level(1), inCombat(false), showAttackPrompt(false), enemyStatsText(font, "0", 10), playerStatsText(font, "0", 10),skillPoints(0), showSkillTree(false) {
+             level(1), inCombat(false), showAttackPrompt(false), enemyStatsText(font, "0", 10), playerStatsText(font, "0", 10),
+             skillPoints(0), showSkillTree(false), inventoryText(font, "Inventory", 10) {
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
         rng.seed(seed);
         
@@ -103,39 +108,43 @@ public:
         enemyStatsText.setFillColor(sf::Color::White);
         enemyStatsText.setPosition(sf::Vector2f(200.f, 10.f));
         
+        inventoryText.setFont(font);
+        inventoryText.setCharacterSize(16);
+        inventoryText.setFillColor(sf::Color::White);
+        inventoryText.setPosition(sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 180.f));
+        
         // Load all textures
         if (!playerTexture.loadFromFile("assets/player2.png")) {
             std::cerr << "Error loading player texture\n";
         }
-        if (!wallTexture.loadFromFile("assets/wall.jpg")) {  // Add your wall image
+        if (!wallTexture.loadFromFile("assets/wall.jpg")) {
             std::cerr << "Error loading wall texture\n";
         }
-        if (!stairsTexture.loadFromFile("assets/stairs.png")) {  // Add your stairs image
+        if (!stairsTexture.loadFromFile("assets/stairs.png")) {
             std::cerr << "Error loading stairs texture\n";
         }
-        if (!healTexture.loadFromFile("assets/heal.png")) {  // Add your heal item image
+        if (!healTexture.loadFromFile("assets/heal.png")) {
             std::cerr << "Error loading heal texture\n";
         }
-        if (!weaponTexture.loadFromFile("assets/weapon.png")) {  // Add your weapon image
+        if (!weaponTexture.loadFromFile("assets/weapon.png")) {
             std::cerr << "Error loading weapon texture\n";
         }
-        if (!armorTexture.loadFromFile("assets/armor.png")) {  // Add your armor image
+        if (!armorTexture.loadFromFile("assets/armor.png")) {
             std::cerr << "Error loading armor texture\n";
         }
-        if (!floorTexture.loadFromFile("assets/floor.jpg")) {  // Add your armor image
-            std::cerr << "Error loading armor texture\n";
+        if (!floorTexture.loadFromFile("assets/floor.jpg")) {
+            std::cerr << "Error loading floor texture\n";
         }
-        
         
         // Load enemy textures
         enemyTextures.resize(3);
-        if (!enemyTextures[0].loadFromFile("assets/goblin.png")) {  // Add your goblin image
+        if (!enemyTextures[0].loadFromFile("assets/goblin.png")) {
             std::cerr << "Error loading goblin texture\n";
         }
-        if (!enemyTextures[1].loadFromFile("assets/orc.png")) {  // Add your orc image
+        if (!enemyTextures[1].loadFromFile("assets/orc.png")) {
             std::cerr << "Error loading orc texture\n";
         }
-        if (!enemyTextures[2].loadFromFile("assets/troll.png")) {  // Add your troll image
+        if (!enemyTextures[2].loadFromFile("assets/troll.png")) {
             std::cerr << "Error loading troll texture\n";
         }
         
@@ -151,6 +160,16 @@ public:
         });
 
         generateNewLevel();
+    }
+
+    // Clean up dynamically allocated objects
+    ~Game() {
+        for (auto* obj : worldObjects) {
+            delete obj;
+        }
+        for (auto* obj : inventory) {
+            delete obj;
+        }
     }
 
     void applySkill(Skill* skill) {
@@ -175,57 +194,77 @@ public:
     }
     
     void generateNewLevel() {
+        // Clear previous objects
+        for (auto* obj : worldObjects) {
+            if (obj != nullptr) {
+                delete obj;
+            }
+        }
+        worldObjects.clear();
+    
+        // Clear enemies
+        enemies.clear();
+    
+        // Generate a new maze
         Maze maze(rng());
         grid = maze.getGrid();
-        
+    
+        // Ensure the grid is valid
+        if (grid.empty() || grid.size() != GRID_HEIGHT || grid[0].size() != GRID_WIDTH) {
+            std::cerr << "Error: Invalid grid dimensions!" << std::endl;
+            return;
+        }
+    
         // Place player
         do {
-            player.pos.x = std::uniform_int_distribution<int>(1, GRID_WIDTH / 4)(rng);
-            player.pos.y = std::uniform_int_distribution<int>(1, GRID_HEIGHT / 4)(rng);
+            player.pos.x = std::uniform_int_distribution<int>(1, GRID_WIDTH - 2)(rng);
+            player.pos.y = std::uniform_int_distribution<int>(1, GRID_HEIGHT - 2)(rng);
         } while (grid[player.pos.y][player.pos.x] != EMPTY);
         grid[player.pos.y][player.pos.x] = PLAYER;
-        
-        // Place enemies with level scaling
-        enemies.clear();
+    
+        // Place enemies
         for (int i = 0; i < ENEMY_COUNT; i++) {
             sf::Vector2i enemyPos;
             int enemyType = std::min(level / 2, 2); // Progressively stronger enemies
             float levelMultiplier = 1.0f + (level - 1) * 0.2f; // 20% stronger per level
-            
+    
             do {
                 enemyPos.x = std::uniform_int_distribution<int>(1, GRID_WIDTH - 2)(rng);
                 enemyPos.y = std::uniform_int_distribution<int>(1, GRID_HEIGHT - 2)(rng);
             } while (grid[enemyPos.y][enemyPos.x] != EMPTY || 
-                    std::abs(enemyPos.x - player.pos.x) < 5 || 
-                    std::abs(enemyPos.y - player.pos.y) < 5);
-            
+                     std::abs(enemyPos.x - player.pos.x) < 5 || 
+                     std::abs(enemyPos.y - player.pos.y) < 5);
+    
             int enemyHp = enemyTypes[enemyType].baseHp * levelMultiplier;
             int enemyAttack = enemyTypes[enemyType].baseAttack * levelMultiplier;
             grid[enemyPos.y][enemyPos.x] = ENEMY;
             enemies.push_back(Entity(enemyPos, enemyHp, enemyAttack, enemyType));
         }
-        
-        // Place items
+    
+        // Place heal potions
         for (int i = 0; i < ITEM_COUNT; i++) {
             sf::Vector2i itemPos;
-            int itemType = std::uniform_int_distribution<int>(0, 2)(rng); // 0: heal, 1: weapon, 2: armor
             do {
                 itemPos.x = std::uniform_int_distribution<int>(1, GRID_WIDTH - 2)(rng);
                 itemPos.y = std::uniform_int_distribution<int>(1, GRID_HEIGHT - 2)(rng);
             } while (grid[itemPos.y][itemPos.x] != EMPTY);
-            
-            grid[itemPos.y][itemPos.x] = HEAL + itemType;
+    
+            grid[itemPos.y][itemPos.x] = HEAL;
+    
+            int healAmount = 20 + level * 5;
+            HealPotion* potion = new HealPotion(itemPos, healAmount, "assets/heal.png");
+            worldObjects.push_back(potion);
         }
-
+    
+        // Increment skill points and offer new skills
         if (level > 1) {
             skillPoints++;
-            
-            // Offer random skills
             skillTree.selectRandomSkills(3); // Offer 3 skills to choose from
             showSkillTree = true;
         }
-        
+    
         updateStatsDisplay();
+        updateInventoryDisplay();
     }
     
     bool isAdjacentToEnemy(sf::Vector2i pos) {
@@ -265,9 +304,174 @@ public:
         enemyStatsText.setString(enemyStats);
     }
     
+    void updateInventoryDisplay() {
+        std::string invText = "Inventory (" + std::to_string(inventory.size()) + " items) [I to toggle]\n";
+        
+        if (showInventory && !inventory.empty()) {
+            for (size_t i = 0; i < inventory.size(); i++) {
+                if (i == selectedInventoryItem) {
+                    invText += "> ";
+                } else {
+                    invText += "  ";
+                }
+                
+                invText += std::to_string(i+1) + ": " + inventory[i]->getDescription();
+                
+                // Check if it's a potion
+                HealPotion* potion = dynamic_cast<HealPotion*>(inventory[i]);
+                if (potion) {
+                    invText += " [press U to use]";
+                }
+                
+                invText += "\n";
+            }
+        }
+        
+        inventoryText.setString(invText);
+    }
+    
+    void collectItem(const sf::Vector2i& pos) {
+        for (auto* obj : worldObjects) {
+            if (!obj->isCollected() && obj->getPosition() == pos) {
+                // Collect the object
+                //remove the object from the world objects vector
+                auto it = std::remove(worldObjects.begin(), worldObjects.end(), obj);
+                worldObjects.erase(it, worldObjects.end());
+
+                obj->collect();
+                inventory.push_back(obj);
+                
+                // Update text display
+                std::cout << "Collected " << obj->getName() << std::endl;
+                updateInventoryDisplay();
+                return;
+            }
+        }
+    }
+    
+    void useSelectedItem() {
+        if (inventory.empty() || selectedInventoryItem >= inventory.size()) return;
+        
+        // Check if it's a heal potion
+        HealPotion* potion = dynamic_cast<HealPotion*>(inventory[selectedInventoryItem]);
+        if (potion) {
+            // Use the potion on the player
+            if (potion->use(player)) {
+                std::cout << "Used " << potion->getName() << " and healed for " 
+                          << potion->getHealAmount() << " HP" << std::endl;
+                
+                // Remove the potion from inventory
+                delete inventory[selectedInventoryItem];
+                inventory.erase(inventory.begin() + selectedInventoryItem);
+                
+                // Adjust selected item if needed
+                if (!inventory.empty()) {
+                    selectedInventoryItem = std::min(selectedInventoryItem, 
+                                                  (int)inventory.size() - 1);
+                }
+                
+                updateStatsDisplay();
+                updateInventoryDisplay();
+            }
+        } else {
+            // Handle other item types
+            Object* item = inventory[selectedInventoryItem];
+            
+            // Apply effects based on item name
+            if (item->getName() == "Weapon") {
+                player.attack += item->getValue();
+                std::cout << "Used " << item->getName() << " and gained " 
+                          << item->getValue() << " attack" << std::endl;
+                
+                // Remove from inventory
+                delete inventory[selectedInventoryItem];
+                inventory.erase(inventory.begin() + selectedInventoryItem);
+                
+                // Adjust selected item
+                if (!inventory.empty()) {
+                    selectedInventoryItem = std::min(selectedInventoryItem, 
+                                                  (int)inventory.size() - 1);
+                }
+                
+                updateStatsDisplay();
+                updateInventoryDisplay();
+            }
+            else if (item->getName() == "Armor") {
+                player.hp += item->getValue();
+                std::cout << "Used " << item->getName() << " and gained " 
+                          << item->getValue() << " HP" << std::endl;
+                
+                // Remove from inventory
+                delete inventory[selectedInventoryItem];
+                inventory.erase(inventory.begin() + selectedInventoryItem);
+                
+                // Adjust selected item
+                if (!inventory.empty()) {
+                    selectedInventoryItem = std::min(selectedInventoryItem, 
+                                                  (int)inventory.size() - 1);
+                }
+                
+                updateStatsDisplay();
+                updateInventoryDisplay();
+            }
+        }
+    }
+    
     void handleInput() {
         if (moveClock.getElapsedTime().asSeconds() < MOVE_DELAY) return;
         if (player.hp <= 0) return;
+        
+        // Handle inventory toggling
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::I)) {
+            if (inputClock.getElapsedTime().asSeconds() >= MOVE_DELAY) {
+                showInventory = !showInventory;
+                updateInventoryDisplay();
+                inputClock.restart();
+                return;
+            }
+        }
+        
+        // Handle inventory navigation and usage when inventory is shown
+        if (showInventory && !inventory.empty()) {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) || 
+                sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
+                if (inputClock.getElapsedTime().asSeconds() >= MOVE_DELAY) {
+                    selectedInventoryItem = (selectedInventoryItem + inventory.size() - 1) % inventory.size();
+                    updateInventoryDisplay();
+                    inputClock.restart();
+                    return;
+                }
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || 
+                     sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
+                if (inputClock.getElapsedTime().asSeconds() >= MOVE_DELAY) {
+                    selectedInventoryItem = (selectedInventoryItem + 1) % inventory.size();
+                    updateInventoryDisplay();
+                    inputClock.restart();
+                    return;
+                }
+            }
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::U)) {
+                if (inputClock.getElapsedTime().asSeconds() >= MOVE_DELAY) {
+                    useSelectedItem();
+                    inputClock.restart();
+                    return;
+                }
+            }
+            
+            // Allow closing inventory with Escape
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)) {
+                if (inputClock.getElapsedTime().asSeconds() >= MOVE_DELAY) {
+                    showInventory = false;
+                    updateInventoryDisplay();
+                    inputClock.restart();
+                    return;
+                }
+            }
+            
+            // Block other inputs when inventory is open
+            return;
+        }
         
         // Handle skill tree if it's active
         if (showSkillTree) {
@@ -289,19 +493,23 @@ public:
             bool selected = false;
             
             // Allow selecting adjacent walls
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) || 
+                sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
                 targetPos.y = std::max(0, player.pos.y - 1);
                 selected = true;
             }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || 
+                     sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
                 targetPos.y = std::min(GRID_HEIGHT - 1, player.pos.y + 1);
                 selected = true;
             }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || 
+                     sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
                 targetPos.x = std::max(0, player.pos.x - 1);
                 selected = true;
             }
-            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
+            else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || 
+                     sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
                 targetPos.x = std::min(GRID_WIDTH - 1, player.pos.x + 1);
                 selected = true;
             }
@@ -348,7 +556,6 @@ public:
             return;
         }
 
-
         sf::Vector2i newPos = player.pos;
         bool moved = false;
         
@@ -382,19 +589,23 @@ public:
             }
         }
         
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up) || 
+            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) {
             newPos.y = std::max(0, player.pos.y - 1);
             moved = true;
         }
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || 
+                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
             newPos.y = std::min(GRID_HEIGHT - 1, player.pos.y + 1);
             moved = true;
         }
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) || 
+                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) {
             newPos.x = std::max(0, player.pos.x - 1);
             moved = true;
         }
-        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
+        else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) || 
+                 sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) {
             newPos.x = std::min(GRID_WIDTH - 1, player.pos.x + 1);
             moved = true;
         }
@@ -402,16 +613,15 @@ public:
         if (moved && newPos != player.pos) {
             int target = grid[newPos.y][newPos.x];
             if (target == EMPTY || target >= HEAL) {
+                // Always empty old player position
                 grid[player.pos.y][player.pos.x] = EMPTY;
-                if (target == HEAL) {
-                    player.hp += 25 + level * 5;  // Scaling heal amount
+                
+                // Collect items if stepping on one
+                if (target >= HEAL && target <= ARMOR) {
+                    collectItem(newPos);
                 }
-                else if (target == WEAPON) {
-                    player.attack += 5 + level * 2;  // Scaling attack boost
-                }
-                else if (target == ARMOR) {
-                    player.hp += 20 + level * 5;  // Scaling hp boost
-                }
+                
+                // Move to the new position
                 grid[newPos.y][newPos.x] = PLAYER;
                 player.pos = newPos;
                 moveClock.restart();
@@ -468,26 +678,30 @@ public:
     void draw(sf::RenderWindow& window) {
         window.clear(sf::Color(30, 30, 40));
         
-        sf::Sprite sprite(floorTexture); // Sprite réutilisable
+        // Draw the floor and game elements with fog of war effect
+        sf::Sprite sprite(floorTexture); // Reusable sprite
         for (int y = 0; y < GRID_HEIGHT; y++) {
             for (int x = 0; x < GRID_WIDTH; x++) {
-                // Calculer la distance entre la case et le joueur (distance de Manhattan)
+                // Calculate Manhattan distance between the cell and player
                 int dx = std::abs(x - player.pos.x);
                 int dy = std::abs(y - player.pos.y);
-                float distance = static_cast<float>(dx + dy); // Distance de Manhattan
+                float distance = static_cast<float>(dx + dy);
                 
-                // Appliquer une transparence progressive
-                float alpha = 255.f; // Opacité complète par défaut
+                // Apply progressive transparency based on distance
+                float alpha = 255.f; // Full opacity by default
                 if (distance > VISION_RADIUS / 2) {
-                    // Réduire l'opacité progressivement entre la moitié du rayon et le bord
+                    // Reduce opacity progressively between half radius and edge
                     alpha = 255.f * (VISION_RADIUS - distance) / (VISION_RADIUS / 2);
-                    alpha = std::max(0.f, std::min(255.f, alpha)); // Limiter entre 0 et 255
+                    alpha = std::max(0.f, std::min(255.f, alpha)); // Clamp between 0 and 255
                 }
-
+                
+                // Skip rendering completely invisible tiles for optimization
+                if (alpha <= 5.0f) continue;
+    
                 switch (grid[y][x]) {
                     case EMPTY:
                         sprite = createSprite(floorTexture);
-                        break; // Skip empty spaces
+                        break;
                     case WALL:
                         sprite = createSprite(wallTexture);
                         break;
@@ -502,6 +716,7 @@ public:
                         sprite = createSprite(stairsTexture);
                         break;
                     case ENEMY:
+                        // Find the enemy at this position and use its specific texture
                         for (const auto& e : enemies) {
                             if (e.pos.x == x && e.pos.y == y) {
                                 sprite = createSprite(enemyTextures[e.type]);
@@ -523,26 +738,56 @@ public:
                         break;
                 }
                 
-                // Appliquer la position et la transparence
+                // Apply position and transparency
                 sprite.setPosition(sf::Vector2f(x * GRID_SIZE, y * GRID_SIZE));
                 sprite.setColor(sf::Color(255, 255, 255, static_cast<uint8_t>(alpha)));
                 window.draw(sprite);
             }
         }
         
-        // Afficher les textes (stats, prompt) sans brouillard
+        // Draw UI elements without fog of war
+        
+        // Draw combat prompt when next to an enemy
         if (showAttackPrompt) {
+            sf::RectangleShape promptBg;
+            promptBg.setSize(sf::Vector2f(200.f, 30.f));
+            promptBg.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 220.f, 5.f));
+            promptBg.setFillColor(sf::Color(80, 0, 0, 200));
+            window.draw(promptBg);
+            
             sf::Text attackPrompt(font, "Press SPACE to attack", 16);
-            attackPrompt.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 150.f, 10.f));
-            attackPrompt.setFillColor(sf::Color::Red);
+            attackPrompt.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 210.f, 10.f));
+            attackPrompt.setFillColor(sf::Color::White);
             window.draw(attackPrompt);
         }
         
+        // Draw player stats panel
+        sf::RectangleShape statsBg;
+        statsBg.setSize(sf::Vector2f(180.f, 100.f));
+        statsBg.setPosition(sf::Vector2f(5.f, 5.f));
+        statsBg.setFillColor(sf::Color(0, 0, 60, 200));
+        window.draw(statsBg);
         window.draw(playerStatsText);
-        window.draw(enemyStatsText);
-
+        
+        // Draw enemy stats panel when in combat
+        if (inCombat) {
+            sf::RectangleShape enemyStatsBg;
+            enemyStatsBg.setSize(sf::Vector2f(180.f, 100.f));
+            enemyStatsBg.setPosition(sf::Vector2f(195.f, 5.f));
+            enemyStatsBg.setFillColor(sf::Color(60, 0, 0, 200));
+            window.draw(enemyStatsBg);
+            window.draw(enemyStatsText);
+        }
+        
+        // Draw active skills list
         auto unlockedSkills = skillTree.getUnlockedSkills();
         if (!unlockedSkills.empty()) {
+            sf::RectangleShape skillBg;
+            skillBg.setSize(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 20.f, 30.f));
+            skillBg.setPosition(sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 150.f));
+            skillBg.setFillColor(sf::Color(0, 40, 60, 200));
+            window.draw(skillBg);
+            
             sf::Text skillListText(font);
             skillListText.setCharacterSize(16);
             skillListText.setFillColor(sf::Color::White);
@@ -556,26 +801,88 @@ public:
             }
             
             skillListText.setString(skillList);
-            skillListText.setPosition(sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 150.f));
+            skillListText.setPosition(sf::Vector2f(15.f, GRID_SIZE * GRID_HEIGHT - 145.f));
             window.draw(skillListText);
-    }
-    
-    // Add skill points display
-    if (skillPoints > 0) {
-        sf::Text skillPointsText(font);
-        skillPointsText.setCharacterSize(16);
-        skillPointsText.setFillColor(sf::Color::Yellow);
-        skillPointsText.setString("Skill Points: " + std::to_string(skillPoints) + " (Press T)");
-        skillPointsText.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 200.f,10));
-        window.draw(skillPointsText);
-    }
-    
-    // Draw skill tree if active
+        }
+        
+        // Draw skill points notification
+        if (skillPoints > 0) {
+            sf::RectangleShape skillPointsBg;
+            skillPointsBg.setSize(sf::Vector2f(200.f, 30.f));
+            skillPointsBg.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 210.f, 40.f));
+            skillPointsBg.setFillColor(sf::Color(60, 60, 0, 200));
+            window.draw(skillPointsBg);
+            
+            sf::Text skillPointsText(font);
+            skillPointsText.setCharacterSize(16);
+            skillPointsText.setFillColor(sf::Color::Yellow);
+            skillPointsText.setString("Skill Points: " + std::to_string(skillPoints) + " (Press T)");
+            skillPointsText.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 200.f, 45.f));
+            window.draw(skillPointsText);
+        }
+        
+        // Draw inventory
+        if (showInventory) {
+            // Semi-transparent background for inventory
+            sf::RectangleShape inventoryBg;
+            inventoryBg.setSize(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 20.f, 200.f));
+            inventoryBg.setPosition(sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 220.f));
+            inventoryBg.setFillColor(sf::Color(20, 20, 40, 230));
+            inventoryBg.setOutlineColor(sf::Color(100, 100, 120));
+            inventoryBg.setOutlineThickness(2.f);
+            window.draw(inventoryBg);
+            
+            // Draw inventory text
+            window.draw(inventoryText);
+            
+            // If inventory is empty, show a message
+            if (inventory.empty()) {
+                sf::Text emptyText(font);
+                emptyText.setCharacterSize(16);
+                emptyText.setFillColor(sf::Color(150, 150, 150));
+                emptyText.setString("Your inventory is empty");
+                emptyText.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH / 2 - 80.f, GRID_SIZE * GRID_HEIGHT - 180.f));
+                window.draw(emptyText);
+            }
+            // Draw a hint for controls
+            else {
+                sf::Text controlsText(font);
+                controlsText.setCharacterSize(14);
+                controlsText.setFillColor(sf::Color(150, 150, 150));
+                controlsText.setString("Up/Down: Navigate | U: Use Item | ESC: Close");
+                controlsText.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH / 2 - 140.f, GRID_SIZE * GRID_HEIGHT - 40.f));
+                window.draw(controlsText);
+            }
+        }
+        
+        // Draw skill tree if active
         if (showSkillTree) {
+            // Draw a semi-transparent overlay behind the skill tree
+            sf::RectangleShape overlay;
+            overlay.setSize(sf::Vector2f(GRID_SIZE * GRID_WIDTH, GRID_SIZE * GRID_HEIGHT));
+            overlay.setFillColor(sf::Color(0, 0, 0, 180));
+            window.draw(overlay);
+            
             skillTree.draw(window);
         }
         
+        // Draw wall breaker mode UI
         if (wallBreakerMode) {
+            // Draw remaining time indicator
+            float timeLeft = 5.0f - wallBreakerClock.getElapsedTime().asSeconds();
+            sf::RectangleShape timerBg;
+            timerBg.setSize(sf::Vector2f(200.f, 10.f));
+            timerBg.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH / 2 - 100.f, 5.f));
+            timerBg.setFillColor(sf::Color(50, 50, 50));
+            window.draw(timerBg);
+            
+            sf::RectangleShape timerFill;
+            timerFill.setSize(sf::Vector2f(200.f * (timeLeft / 5.0f), 10.f));
+            timerFill.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH / 2 - 100.f, 5.f));
+            timerFill.setFillColor(sf::Color(0, 200, 100));
+            window.draw(timerFill);
+            
+            // Highlight valid walls to break
             sf::RectangleShape highlight;
             highlight.setSize(sf::Vector2f(GRID_SIZE, GRID_SIZE));
             highlight.setFillColor(sf::Color(0, 255, 0, 100)); // Semi-transparent green
@@ -599,15 +906,56 @@ public:
                 }
             }
             
-            // Add instruction text
+            // Add instruction text with background
+            sf::RectangleShape instructionsBg;
+            instructionsBg.setSize(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 20.f, 30.f));
+            instructionsBg.setPosition(sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 100.f));
+            instructionsBg.setFillColor(sf::Color(0, 60, 0, 200));
+            window.draw(instructionsBg);
+            
             sf::Text instructions(font);
-            instructions.setFont(font);
             instructions.setCharacterSize(16);
             instructions.setString("Select a wall to break (arrow keys), or ESC to cancel");
-            instructions.setFillColor(sf::Color::Yellow);
-            instructions.setPosition(sf::Vector2f( 10, GRID_SIZE * GRID_HEIGHT - 100));
+            instructions.setFillColor(sf::Color::White);
+            instructions.setPosition(sf::Vector2f(15.f, GRID_SIZE * GRID_HEIGHT - 95.f));
             window.draw(instructions);
         }
+        
+        // Draw game over overlay if player is dead
+        if (player.hp <= 0) {
+            sf::RectangleShape gameOverBg;
+            gameOverBg.setSize(sf::Vector2f(GRID_SIZE * GRID_WIDTH, GRID_SIZE * GRID_HEIGHT));
+            gameOverBg.setFillColor(sf::Color(0, 0, 0, 200));
+            window.draw(gameOverBg);
+            
+            sf::Text gameOverText(font);
+            gameOverText.setCharacterSize(48);
+            gameOverText.setFillColor(sf::Color::Red);
+            gameOverText.setString("GAME OVER");
+            gameOverText.setPosition(sf::Vector2f(
+                GRID_SIZE * GRID_WIDTH / 2 - 50 / 2,
+                GRID_SIZE * GRID_HEIGHT / 2 - 50.f
+            ));
+            window.draw(gameOverText);
+            
+            sf::Text levelText(font);
+            levelText.setCharacterSize(24);
+            levelText.setFillColor(sf::Color::White);
+            levelText.setString("You reached level " + std::to_string(level));
+            levelText.setPosition(sf::Vector2f(
+                GRID_SIZE * GRID_WIDTH / 2 - 40 / 2,
+                GRID_SIZE * GRID_HEIGHT / 2 + 10.f
+            ));
+            window.draw(levelText);
+        }
+        
+        // Draw level indicator
+        sf::Text levelIndicator(font);
+        levelIndicator.setCharacterSize(20);
+        levelIndicator.setFillColor(sf::Color::White);
+        levelIndicator.setString("Level " + std::to_string(level));
+        levelIndicator.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH - 100.f, GRID_SIZE * GRID_HEIGHT - 30.f));
+        window.draw(levelIndicator);
     }
     
     int getLevel() const { return level; }
@@ -638,9 +986,6 @@ int main() {
         game.draw(window);
         window.display();
         
-        if (game.isGameOver()) {
-            window.close();
-        }
     }
     
     return 0;

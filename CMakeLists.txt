@@ -18,11 +18,14 @@ set(SOURCES
     src/main.cpp
     src/Maze.cpp
     src/SkillTree.cpp
+    src/Object.cpp
+    src/HealPotion.cpp
 )
 
 # Add your header files (optional, but good practice)
 set(HEADERS
     src/Maze.h
+    src/Entity.h
 )
 
 # Create the executable
