@@ -9,6 +9,8 @@
 #include "Object.h"
 #include "HealPotion.h"
 #include "Entity.h"
+#include "view/ViewManager.h"
+#include "view/GameGridView.h"
 
 #define ENEMY_COUNT 5
 #define ITEM_COUNT 3
@@ -66,6 +68,9 @@ private:
     bool showInventory = false;             // Toggle for inventory display
     int selectedInventoryItem = 0;          // Currently selected inventory item
 
+    // View manager
+    std::unique_ptr<ViewManager> viewManager;
+
     // Define enemy types
     std::vector<EnemyType> enemyTypes = {
         {30, 10, sf::Color(200, 50, 50), "Goblin"},      // Weak enemy
@@ -90,9 +95,9 @@ private:
     }
 
 public:
-    Game() : player(sf::Vector2i(0, 0), PLAYER_BASE_HP, PLAYER_BASE_ATTACK), 
+    Game(sf::RenderWindow& window) : player(sf::Vector2i(0, 0), PLAYER_BASE_HP, PLAYER_BASE_ATTACK), 
              level(1), inCombat(false), showAttackPrompt(false), enemyStatsText(font, "0", 10), playerStatsText(font, "0", 10),
-             skillPoints(0), showSkillTree(false), inventoryText(font, "Inventory", 10) {
+             skillPoints(0), showSkillTree(false), inventoryText(font, "Inventory", 10), viewManager(std::make_unique<ViewManager>(window)) {
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
         rng.seed(seed);
         
@@ -163,6 +168,9 @@ public:
             updateStatsDisplay();
             showSkillTree = false;
         });
+        
+        viewManager->addView("gameWorld", std::make_unique<GameGridView>(
+            window, grid, player, enemies));
 
         generateNewLevel();
     }
@@ -691,76 +699,79 @@ public:
 
     void draw(sf::RenderWindow& window) {
         window.clear(sf::Color(30, 30, 40));
+        viewManager->update();
         
+        // Draw all views
+        viewManager->draw();
         // Draw the floor and game elements with fog of war effect
         sf::Sprite sprite(floorTexture); // Reusable sprite
-        for (int y = 0; y < GRID_HEIGHT; y++) {
-            for (int x = 0; x < GRID_WIDTH; x++) {
-                // Calculate Manhattan distance between the cell and player
-                int dx = std::abs(x - player.pos.x);
-                int dy = std::abs(y - player.pos.y);
-                float distance = static_cast<float>(dx + dy);
+        // for (int y = 0; y < GRID_HEIGHT; y++) {
+        //     for (int x = 0; x < GRID_WIDTH; x++) {
+        //         // Calculate Manhattan distance between the cell and player
+        //         int dx = std::abs(x - player.pos.x);
+        //         int dy = std::abs(y - player.pos.y);
+        //         float distance = static_cast<float>(dx + dy);
                 
-                // Apply progressive transparency based on distance
-                float alpha = 255.f; // Full opacity by default
-                if (distance > VISION_RADIUS / 2) {
-                    // Reduce opacity progressively between half radius and edge
-                    alpha = 255.f * (VISION_RADIUS - distance) / (VISION_RADIUS / 2);
-                    alpha = std::max(0.f, std::min(255.f, alpha)); // Clamp between 0 and 255
-                }
+        //         // Apply progressive transparency based on distance
+        //         float alpha = 255.f; // Full opacity by default
+        //         if (distance > VISION_RADIUS / 2) {
+        //             // Reduce opacity progressively between half radius and edge
+        //             alpha = 255.f * (VISION_RADIUS - distance) / (VISION_RADIUS / 2);
+        //             alpha = std::max(0.f, std::min(255.f, alpha)); // Clamp between 0 and 255
+        //         }
                 
-                // Skip rendering completely invisible tiles for optimization
-                if (alpha <= 5.0f) continue;
+        //         // Skip rendering completely invisible tiles for optimization
+        //         if (alpha <= 5.0f) continue;
     
-                switch (grid[y][x]) {
-                    case EMPTY:
-                        sprite = createSprite(floorTexture);
-                        break;
-                    case WALL:
-                        sprite = createSprite(wallTexture);
-                        break;
-                    case PLAYER:
-                        sprite = createSprite(floorTexture);
-                        sprite.setPosition(sf::Vector2f(x * GRID_SIZE, y * GRID_SIZE));
-                        sprite.setColor(sf::Color(255, 255, 255, static_cast<uint8_t>(alpha)));
-                        window.draw(sprite);
-                        sprite = createSprite(playerTexture);
-                        break;
-                    case STAIRS:
-                        sprite = createSprite(stairsTexture);
-                        break;
-                    case ENEMY:
-                        // Find the enemy at this position and use its specific texture
-                        for (const auto& e : enemies) {
-                            if (e.pos.x == x && e.pos.y == y) {
-                                sprite = createSprite(enemyTextures[e.type]);
-                                break;
-                            }
-                        }
-                        break;
-                    case HEAL:
-                        sprite = createSprite(healTexture);
-                        break;
-                    case WEAPON:
-                        sprite = createSprite(weaponTexture);
-                        break;
-                    case ARMOR:
-                        sprite = createSprite(armorTexture);
-                        break;
-                    case ROOM:
-                        sprite = createSprite(floorTexture);
-                        break;
-                    case TREASURE:
-                        sprite = createSprite(treasureTexture);
-                        break;
-                }
+        //         switch (grid[y][x]) {
+        //             case EMPTY:
+        //                 sprite = createSprite(floorTexture);
+        //                 break;
+        //             case WALL:
+        //                 sprite = createSprite(wallTexture);
+        //                 break;
+        //             case PLAYER:
+        //                 sprite = createSprite(floorTexture);
+        //                 sprite.setPosition(sf::Vector2f(x * GRID_SIZE, y * GRID_SIZE));
+        //                 sprite.setColor(sf::Color(255, 255, 255, static_cast<uint8_t>(alpha)));
+        //                 window.draw(sprite);
+        //                 sprite = createSprite(playerTexture);
+        //                 break;
+        //             case STAIRS:
+        //                 sprite = createSprite(stairsTexture);
+        //                 break;
+        //             case ENEMY:
+        //                 // Find the enemy at this position and use its specific texture
+        //                 for (const auto& e : enemies) {
+        //                     if (e.pos.x == x && e.pos.y == y) {
+        //                         sprite = createSprite(enemyTextures[e.type]);
+        //                         break;
+        //                     }
+        //                 }
+        //                 break;
+        //             case HEAL:
+        //                 sprite = createSprite(healTexture);
+        //                 break;
+        //             case WEAPON:
+        //                 sprite = createSprite(weaponTexture);
+        //                 break;
+        //             case ARMOR:
+        //                 sprite = createSprite(armorTexture);
+        //                 break;
+        //             case ROOM:
+        //                 sprite = createSprite(floorTexture);
+        //                 break;
+        //             case TREASURE:
+        //                 sprite = createSprite(treasureTexture);
+        //                 break;
+        //         }
                 
-                // Apply position and transparency
-                sprite.setPosition(sf::Vector2f(x * GRID_SIZE, y * GRID_SIZE));
-                sprite.setColor(sf::Color(255, 255, 255, static_cast<uint8_t>(alpha)));
-                window.draw(sprite);
-            }
-        }
+        //         // Apply position and transparency
+        //         sprite.setPosition(sf::Vector2f(x * GRID_SIZE, y * GRID_SIZE));
+        //         sprite.setColor(sf::Color(255, 255, 255, static_cast<uint8_t>(alpha)));
+        //         window.draw(sprite);
+        //     }
+        // }
         
         // Draw UI elements without fog of war
         
@@ -1015,7 +1026,7 @@ int main() {
     );
     window.setFramerateLimit(60);
     
-    Game game;
+    Game game(window);
     
     while (window.isOpen())
     {
