@@ -8,6 +8,7 @@
 #include <memory>
 #include <random>
 #include <iostream>
+#include "View.h"
 
 // Forward declaration
 class Game;
@@ -54,7 +55,7 @@ public:
 };
 
 // SkillTree class to manage skills and skill selection
-class SkillTree {
+class SkillTree : public View {
 private:
     std::vector<std::unique_ptr<Skill>> skills;
     sf::Font font;
@@ -68,7 +69,7 @@ private:
     std::function<void(Skill*)> onSkillSelected;
 
 public:
-    SkillTree();
+    SkillTree(sf::RenderWindow& window);
     
     void initializeSkills();
     void setPosition(sf::Vector2f position, sf::Vector2f size);
@@ -79,8 +80,8 @@ public:
     bool isActiveState() const;
     void selectRandomSkills(int count);
     void handleInput(const sf::Clock& inputClock, float inputDelay);
-    void updateDescription();
-    void draw(sf::RenderWindow& window);
+    void draw() override; // Override from View
+    void update() override; // Override from View
     std::vector<Skill*> getUnlockedSkills() const;
 };
 

@@ -17,6 +17,7 @@ public:
     
     void setGrid(const std::vector<std::vector<int>>& grid);
     void setVisionRadius(int radius);
+    int getVisionRadius();
     void loadTextures();
     
 private:

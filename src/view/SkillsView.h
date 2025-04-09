@@ -1,7 +1,7 @@
 #pragma once
 
 #include "View.h"
-#include "../SkillTree.h"
+#include "SkillTreeView.h"
 #include <vector>
 
 class SkillsView : public View {

@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(SFML)
 set(SOURCES
     src/main.cpp
     src/Maze.cpp
-    src/SkillTree.cpp
+    src/view/SkillTreeView.cpp
     src/Object.cpp
     src/HealPotion.cpp
     src/view/CombatPromptView.cpp
@@ -28,6 +28,12 @@ set(SOURCES
     src/view/PlayerStatsView.cpp
     src/view/View.cpp
     src/view/ViewManager.cpp
+    src/view/GameOverView.cpp
+    src/view/WallBreakerView.cpp
+    src/view/WinView.cpp
+    src/Weapon.cpp 
+    src/Armor.cpp
+    src/Key.cpp
 )
 
 # Add your header files (optional, but good practice)

@@ -1,9 +1,6 @@
 #include "CombatPromptView.h"
 #include <iostream>
-
-// Assuming GRID_SIZE, GRID_WIDTH are defined globally
-const int GRID_SIZE = 32;
-const int GRID_WIDTH = 20;
+#include "../Maze.h"
 
 CombatPromptView::CombatPromptView(sf::RenderWindow& window)
     : View(window, sf::Vector2f(GRID_SIZE * GRID_WIDTH - 220.f, 5.f), sf::Vector2f(200.f, 30.f)),

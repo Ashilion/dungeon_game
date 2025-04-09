@@ -87,6 +87,12 @@ void GameGridView::loadTextures() {
     } else {
         std::cerr << "Error loading troll texture\n";
     }
+
+    if (texture.loadFromFile("assets/key.jpg")) {
+        textures["key"] = texture;
+    } else {
+        std::cerr << "Error loading key texture\n";
+    }
 }
 
 sf::Sprite GameGridView::createSprite(const sf::Texture& texture) {
@@ -178,6 +184,9 @@ void GameGridView::draw() {
                 case TREASURE:
                     sprite = createSprite(textures["treasure"]);
                     break;
+                case KEY:
+                    sprite = createSprite(textures["key"]);
+                    break;
                 default:
                     sprite = createSprite(textures["floor"]);
                     break;
@@ -204,4 +213,8 @@ void GameGridView::setGrid(const std::vector<std::vector<int>>& newGrid) {
 
 void GameGridView::setVisionRadius(int radius) {
     visionRadius = radius;
+}
+
+int GameGridView::getVisionRadius() {
+    return visionRadius;
 }

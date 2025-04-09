@@ -2,6 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include <string>
 #include <functional>
+#include <random>
 #include "Object.h" // Include the base class
 // Forward declaration of Entity to avoid circular dependency
 struct Entity;
@@ -21,4 +22,8 @@ class HealPotion : public Object {
         
         // Override description for more detail
         std::string getDescription() const override;
+
+        static void generateHealPotions(std::vector<std::vector<int>>& grid, 
+            std::vector<Object*>& worldObjects, 
+            int itemCount, int level, std::mt19937& rng);
     };

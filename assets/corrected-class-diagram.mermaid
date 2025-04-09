@@ -1,0 +1,161 @@
+classDiagram
+    class Game {
+        -std::vector~std::vector~int~~ grid
+        -Entity player
+        -sf::Clock moveClock
+        -sf::Clock attackClock
+        -int level
+        -std::mt19937 rng
+        -std::vector~Entity~ enemies
+        -bool inCombat
+        -bool showAttackPrompt
+        -sf::Font font
+        -int skillPoints
+        -bool showSkillTree
+        -sf::Clock inputClock
+        -bool wallBreakerMode
+        -sf::Clock wallBreakerClock
+        -SkillTree* skillTree
+        -std::vector~Object*~ worldObjects
+        -std::vector~Object*~ inventory
+        -bool showInventory
+        -int selectedInventoryItem
+        -std::unique_ptr~ViewManager~ viewManager
+        -std::vector~EnemyType~ enemyTypes
+        -sf::Sprite createSprite(const sf::Texture& texture)
+        +Game(sf::RenderWindow& window)
+        +~Game()
+        +void applySkill(Skill* skill)
+        +void generateNewLevel()
+        +bool isAdjacentToEnemy(sf::Vector2i pos)
+        +void updateStatsDisplay()
+        +void updateInventoryDisplay()
+        +void updateWallBreakerDisplay()
+        +void updateWinDisplay()
+        +void updateGameOverDisplay()
+        +void collectItem(const sf::Vector2i& pos)
+        +void useSelectedItem()
+        +void handleInput()
+        +void useActiveSkill(int index)
+        +void draw(sf::RenderWindow& window)
+        +int getLevel() const
+        +bool isGameOver() const
+    }
+
+    class Entity {
+        -sf::Vector2i pos
+        -int hp
+        -int attack
+        -int type
+        +Entity(sf::Vector2i pos, int hp, int attack, int type)
+    }
+
+    class SkillTree {
+        +void setCallback(std::function~void(Skill*)~ callback)
+        +void setPosition(sf::Vector2f topLeft, sf::Vector2f bottomRight)
+        +void handleInput(sf::Clock& inputClock, float moveDelay)
+        +std::vector~Skill*~ getUnlockedSkills()
+        +void selectRandomSkills(int count)
+    }
+
+    class Skill {
+        <<enumeration>>
+        SkillType
+        HEALTH_BOOST
+        ATTACK_BOOST
+        VISION_BOOST
+        WALL_BREAKER
+        +void unlock()
+        +bool use()
+        +SkillType getType()
+        +int getUsesLeft()
+    }
+
+    class Object {
+        +std::string getName()
+        +int getValue()
+        +sf::Vector2i getPosition()
+        +bool isCollected()
+        +void collect()
+    }
+
+    class HealPotion {
+        +static void generateHealPotions(std::vector~std::vector~int~~& grid, std::vector~Object*~& worldObjects, int count, int level, std::mt19937& rng)
+        +bool use(Entity& entity)
+        +int getHealAmount()
+    }
+
+    class Weapon {
+        +static void generateWeapons(std::vector~std::vector~int~~& grid, std::vector~Object*~& worldObjects, int count, int level, std::mt19937& rng)
+    }
+
+    class Armor {
+        +static void generateArmors(std::vector~std::vector~int~~& grid, std::vector~Object*~& worldObjects, int count, int level, std::mt19937& rng)
+    }
+
+    class Key {
+        +static void generateKey(std::vector~std::vector~int~~& grid, std::vector~Object*~& worldObjects, std::mt19937& rng)
+    }
+
+    class ViewManager {
+        +void addView(std::string name, std::unique_ptr~View~ view)
+        +View* getView(std::string name)
+        +void update()
+        +void draw()
+    }
+
+    class View {
+        +void setVisible(bool visible)
+        +void update()
+    }
+
+    class GameGridView {
+        +GameGridView(sf::RenderWindow& window, std::vector~std::vector~int~~& grid, Entity& player, std::vector~Entity~& enemies)
+    }
+
+    class PlayerStatsView {
+        +PlayerStatsView(sf::RenderWindow& window, Entity& player)
+    }
+
+    class EnemyStatsView {
+        +EnemyStatsView(sf::RenderWindow& window, Entity& player, std::vector~Entity~& enemies, std::vector~EnemyType~& enemyTypes)
+    }
+
+    class InventoryView {
+        +InventoryView(sf::RenderWindow& window, std::vector~Object*~& inventory)
+    }
+
+    class WallBreakerView {
+        +WallBreakerView(sf::RenderWindow& window, sf::Font& font, Entity& player, std::vector~std::vector~int~~& grid)
+    }
+
+    class WinView {
+        +WinView(sf::RenderWindow& window, sf::Font& font)
+    }
+
+    class GameOverView {
+        +GameOverView(sf::RenderWindow& window, sf::Font& font)
+    }
+
+    Game --> Entity
+    Game --> SkillTree
+    Game --> Object
+    Game --> ViewManager
+    Game --> HealPotion
+    Game --> Weapon
+    Game --> Armor
+    Game --> Key
+    Game --> View
+    ViewManager --> View
+    SkillTree --> Skill
+    HealPotion --|> Object
+    Weapon --|> Object
+    Armor --|> Object
+    Key --|> Object
+    GameGridView --|> View
+    PlayerStatsView --|> View
+    EnemyStatsView --|> View
+    InventoryView --|> View
+    WallBreakerView --|> View
+    WinView --|> View
+    GameOverView --|> View

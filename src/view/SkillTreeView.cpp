@@ -3,7 +3,7 @@
 #include <string>
 #include <functional>
 #include <memory>
-#include "SkillTree.h"
+#include "SkillTreeView.h"
 
 // Skill class to represent individual skills
 
@@ -25,7 +25,7 @@ Skill::Skill(SkillType type, const std::string& name, const std::string& descrip
 
 
 
-SkillTree::SkillTree() : selectedSkillIndex(0), isActive(false), titleText(font), descriptionText(font), instructionText(font) {
+SkillTree::SkillTree(sf::RenderWindow& window) :View(window), selectedSkillIndex(0), isActive(false), titleText(font), descriptionText(font), instructionText(font) {
         if (!font.openFromFile("assets/arial.ttf")) {
             std::cerr << "Error loading font\n";
         }
@@ -53,7 +53,7 @@ SkillTree::SkillTree() : selectedSkillIndex(0), isActive(false), titleText(font)
         selectionHighlight.setOutlineColor(sf::Color::White);
         selectionHighlight.setOutlineThickness(2);
         selectionHighlight.setSize(sf::Vector2f(180, 60));
-        
+        this->visible = false;
         // Initialize skills
         initializeSkills();
     }
@@ -154,7 +154,7 @@ SkillTree::SkillTree() : selectedSkillIndex(0), isActive(false), titleText(font)
     void SkillTree::activate() {
         isActive = true;
         selectedSkillIndex = 0;
-        updateDescription();
+        update();
     }
     
     void SkillTree::deactivate() {
@@ -234,16 +234,17 @@ SkillTree::SkillTree() : selectedSkillIndex(0), isActive(false), titleText(font)
                     onSkillSelected(skills[selectedSkillIndex].get());
                 }
                 deactivate();
+                this->visible = false;
                 inputHandled = true;
             }
         }
         
         if (inputHandled && prevIndex != selectedSkillIndex) {
-            updateDescription();
+            update();
         }
     }
     
-    void SkillTree::updateDescription() {
+    void SkillTree::update() {
         if (selectedSkillIndex >= 0 && selectedSkillIndex < static_cast<int>(skills.size())) {
             auto& skill = skills[selectedSkillIndex];
             
@@ -260,7 +261,7 @@ SkillTree::SkillTree() : selectedSkillIndex(0), isActive(false), titleText(font)
         }
     }
     
-    void SkillTree::draw(sf::RenderWindow& window) {
+    void SkillTree::draw() {
         // if (!isActive) return;
         
         window.draw(background);

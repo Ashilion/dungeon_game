@@ -1,56 +1,49 @@
 #include "InventoryView.h"
 #include "../HealPotion.h"
 #include <iostream>
-
-// Assuming GRID_SIZE, GRID_WIDTH, and GRID_HEIGHT are defined globally
-const int GRID_SIZE = 32;
-const int GRID_WIDTH = 20;
-const int GRID_HEIGHT = 15;
+#include "../Maze.h"
 
 InventoryView::InventoryView(sf::RenderWindow& window, const std::vector<Object*>& inventory)
     : View(window, sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 220.f), 
            sf::Vector2f(GRID_SIZE * GRID_WIDTH - 20.f, 200.f)),
-      inventory(inventory), showInventory(false), selectedItem(0) , inventoryText(font), controlsText(font) {
+      inventory(inventory), showInventory(false), selectedItem(0) , inventoryText(font), controlsText(font){
     
-    // Initialize the font
+    // Initialiser la font
     if (!font.openFromFile("assets/arial.ttf")) {
         std::cerr << "Error loading font\n";
     }
     
-    // Initialize the inventory text
+    // Initialisation des éléments graphiques
     inventoryText.setFont(font);
     inventoryText.setCharacterSize(16);
     inventoryText.setFillColor(sf::Color::White);
     inventoryText.setPosition(position);
     
-    // Initialize the background
     background.setSize(size);
     background.setPosition(position);
     background.setFillColor(sf::Color(20, 20, 40, 230));
     background.setOutlineColor(sf::Color(100, 100, 120));
     background.setOutlineThickness(2.f);
-    
-    // Initialize controls text
+
     controlsText.setFont(font);
     controlsText.setCharacterSize(14);
     controlsText.setFillColor(sf::Color(150, 150, 150));
     controlsText.setString("Up/Down: Navigate | U: Use Item | ESC: Close");
     controlsText.setPosition(sf::Vector2f(GRID_SIZE * GRID_WIDTH / 2 - 140.f, 
                                         GRID_SIZE * GRID_HEIGHT - 40.f));
+
+    
+    this->visible = false;
     
     update();
 }
 
 void InventoryView::draw() {
-    if (!visible || !showInventory) return;
-    
-    // Draw the background
+    if (!this->visible) return;
     window.draw(background);
-    
-    // Draw the inventory text
     window.draw(inventoryText);
     
-    // If inventory is empty, show a message
+    // Affiche le texte d'inventaire
     if (inventory.empty()) {
         sf::Text emptyText(font);
         emptyText.setFont(font);
@@ -61,7 +54,7 @@ void InventoryView::draw() {
                                           GRID_SIZE * GRID_HEIGHT - 180.f));
         window.draw(emptyText);
     } else {
-        // Draw controls hint
+        // Dessine la position du texte d'inventaire
         window.draw(controlsText);
     }
 }
@@ -69,7 +62,7 @@ void InventoryView::draw() {
 void InventoryView::update() {
     std::string invText = "Inventory (" + std::to_string(inventory.size()) + " items) [I to toggle]\n";
     
-    if (showInventory && !inventory.empty()) {
+    if (this->visible && !inventory.empty()) {
         for (size_t i = 0; i < inventory.size(); i++) {
             if (i == static_cast<size_t>(selectedItem)) {
                 invText += "> ";
@@ -138,7 +131,7 @@ void InventoryView::update() {
 // }
 
 void InventoryView::setShowInventory(bool show) {
-    showInventory = show;
+    this->visible = show;
     update();
 }
 

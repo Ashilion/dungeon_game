@@ -1,10 +1,7 @@
 #include "SkillsView.h"
 #include <iostream>
-#include "../SkillTree.h"
-// Assuming GRID_SIZE, GRID_WIDTH, GRID_HEIGHT are defined globally
-const int GRID_SIZE = 32;
-const int GRID_WIDTH = 20;
-const int GRID_HEIGHT = 15;
+#include "SkillTreeView.h"
+#include "../Maze.h"
 
 SkillsView::SkillsView(sf::RenderWindow& window, const SkillTree& skillTree)
     : View(window, sf::Vector2f(10.f, GRID_SIZE * GRID_HEIGHT - 150.f), 

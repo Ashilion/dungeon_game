@@ -25,6 +25,7 @@ enum EntityType {
     ARMOR = 7,
     ROOM = 8 ,
     TREASURE = 9,
+    KEY=10
 };
 
 class Maze {

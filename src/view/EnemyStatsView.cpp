@@ -24,11 +24,12 @@ EnemyStatsView::EnemyStatsView(sf::RenderWindow& window,
     background.setPosition(position);
     background.setFillColor(sf::Color(60, 0, 0, 200));
     
+    this->visible = false;
     update();
 }
 
 void EnemyStatsView::draw() {
-    if (!visible || !inCombat) return;
+    if (!visible) return;
     
     // Draw the background
     window.draw(background);
@@ -39,8 +40,7 @@ void EnemyStatsView::draw() {
 
 void EnemyStatsView::update() {
     std::string enemyStats = "Enemy\n";
-    
-    if (inCombat) {
+    if (this->visible) {
         for (const auto& enemy : enemies) {
             if (std::abs(enemy.pos.x - player.pos.x) + std::abs(enemy.pos.y - player.pos.y) == 1) {
                 if (enemy.type >= 0 && enemy.type < static_cast<int>(enemyTypes.size())) {
